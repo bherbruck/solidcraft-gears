@@ -1,34 +1,26 @@
 {
   "id": "solidcraft-gears",
   "name": "Gears",
-  "version": "0.1.1",
-  "description": "Involute spur gear generator: module, teeth, pressure angle, face width, bore and profile shift. Builds an editable sketch and features.",
-  "capabilities": [
-    "commands@0.1"
-  ],
+  "version": "0.1.15",
+  "description": "Involute spur gear generator: separate Inch and Metric menu entries, automatic 1, 2, 3 numbering, separated/meshed auto-placement with tooth-phase rotation, and outer diameter display.",
+  "capabilities": ["commands@0.1"],
   "runtime": {
     "module": "plugin.wasm",
     "entries": [
       {
-        "name": "make-gear",
+        "name": "make-gear-in",
         "effect": "edit",
         "input_schema": {
           "type": "object",
-          "required": [
-            "module",
-            "teeth",
-            "face_width",
-            "pressure_angle"
-          ],
+          "required": ["module", "teeth", "face_width", "pressure_angle"],
           "properties": {
             "module": {
               "type": "number",
-              "title": "Module",
-              "description": "Module m. Pitch diameter = module x teeth",
-              "default": 2,
-              "minimum": 0.1,
-              "maximum": 100,
-              "unit": "mm"
+              "title": "Module (in)",
+              "description": "Inch module m (for US Diametral Pitch, calculate 1 ÷ DP first). Outer diameter = module x (teeth + 2)",
+              "default": 0.075,
+              "minimum": 0.005,
+              "maximum": 100
             },
             "teeth": {
               "type": "integer",
@@ -40,12 +32,11 @@
             },
             "face_width": {
               "type": "number",
-              "title": "Face width",
-              "description": "Gear thickness",
-              "default": 10,
-              "minimum": 0.1,
-              "maximum": 1000,
-              "unit": "mm"
+              "title": "Face width (in)",
+              "description": "Gear thickness in inches",
+              "default": 0.5,
+              "minimum": 0.01,
+              "maximum": 1000
             },
             "pressure_angle": {
               "type": "number",
@@ -54,16 +45,15 @@
               "default": 20,
               "minimum": 10,
               "maximum": 30,
-              "unit": "°"
+              "unit": "\u00b0"
             },
             "bore_diameter": {
               "type": "number",
-              "title": "Bore diameter",
-              "description": "Centre hole diameter, 0 for none",
+              "title": "Bore diameter (in)",
+              "description": "Centre hole diameter in inches, 0 for none",
               "default": 0,
               "minimum": 0,
-              "maximum": 1000,
-              "unit": "mm"
+              "maximum": 1000
             },
             "profile_shift": {
               "type": "number",
@@ -72,21 +62,153 @@
               "default": 0,
               "minimum": -1,
               "maximum": 1
+            },
+            "mate_gear_index": {
+              "type": "integer",
+              "description": "0 places gear at Manual X/Y offset; enter 1 for Gear 1, 2 for Gear 2, etc.",
+              "default": 0,
+              "minimum": 0,
+              "maximum": 50
+            },
+            "placement_mode": {
+              "type": "string",
+              "title": "Placement mode",
+              "description": "Separated (with 0.25 in print clearance) or Meshed (exact pitch center distance)",
+              "default": "separated",
+              "enum": ["separated", "meshed"]
+            },
+            "mate_side": {
+              "type": "string",
+              "title": "Mate side",
+              "description": "Direction from target gear when Mate with gear # is 1 or higher",
+              "default": "right",
+              "enum": ["right", "left", "top", "bottom"]
+            },
+            "x_offset": {
+              "type": "number",
+              "title": "Manual X offset (in)",
+              "description": "Move finished gear along X when Mate with gear # is 0",
+              "default": 0,
+              "minimum": -10000,
+              "maximum": 10000
+            },
+            "y_offset": {
+              "type": "number",
+              "title": "Manual Y offset (in)",
+              "description": "Move finished gear along Y when Mate with gear # is 0",
+              "default": 0,
+              "minimum": -10000,
+              "maximum": 10000
             }
           }
         },
-        "slots": [
-          {
-            "kind": "menu",
-            "name": "Plugins"
+        "slots": [{ "kind": "menu", "name": "Gears (in)" }]
+      },
+      {
+        "name": "make-gear-mm",
+        "effect": "edit",
+        "input_schema": {
+          "type": "object",
+          "required": ["module", "teeth", "face_width", "pressure_angle"],
+          "properties": {
+            "module": {
+              "type": "number",
+              "title": "Module (mm)",
+              "description": "Metric module m in mm. Outer diameter = module x (teeth + 2)",
+              "default": 2.0,
+              "minimum": 0.05,
+              "maximum": 100
+            },
+            "teeth": {
+              "type": "integer",
+              "title": "Teeth",
+              "description": "Number of teeth",
+              "default": 20,
+              "minimum": 8,
+              "maximum": 80
+            },
+            "face_width": {
+              "type": "number",
+              "title": "Face width (mm)",
+              "description": "Gear thickness in millimeters",
+              "default": 10.0,
+              "minimum": 0.1,
+              "maximum": 1000
+            },
+            "pressure_angle": {
+              "type": "number",
+              "title": "Pressure angle",
+              "description": "Pressure angle of the tooth flanks",
+              "default": 20,
+              "minimum": 10,
+              "maximum": 30,
+              "unit": "\u00b0"
+            },
+            "bore_diameter": {
+              "type": "number",
+              "title": "Bore diameter (mm)",
+              "description": "Centre hole diameter in millimeters, 0 for none",
+              "default": 0,
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "profile_shift": {
+              "type": "number",
+              "title": "Profile shift",
+              "description": "Profile shift coefficient x; outer diameter = module x (teeth + 2 + 2x)",
+              "default": 0,
+              "minimum": -1,
+              "maximum": 1
+            },
+            "mate_gear_index": {
+              "type": "integer",
+              "title": "Mate with gear # (0 = None / Manual)",
+              "description": "0 places gear at Manual X/Y offset; enter 1 for Gear 1, 2 for Gear 2, etc.",
+              "default": 0,
+              "minimum": 0,
+              "maximum": 50
+            },
+            "placement_mode": {
+              "type": "string",
+              "title": "Placement mode",
+              "description": "Separated (with 6.35 mm print clearance) or Meshed (exact pitch center distance)",
+              "default": "separated",
+              "enum": ["separated", "meshed"]
+            },
+            "mate_side": {
+              "type": "string",
+              "title": "Mate side",
+              "description": "Direction from target gear when Mate with gear # is 1 or higher",
+              "default": "right",
+              "enum": ["right", "left", "top", "bottom"]
+            },
+            "x_offset": {
+              "type": "number",
+              "title": "Manual X offset (mm)",
+              "description": "Move finished gear along X when Mate with gear # is 0",
+              "default": 0,
+              "minimum": -10000,
+              "maximum": 10000
+            },
+            "y_offset": {
+              "type": "number",
+              "title": "Manual Y offset (mm)",
+              "description": "Move finished gear along Y when Mate with gear # is 0",
+              "default": 0,
+              "minimum": -10000,
+              "maximum": 10000
+            }
           }
-        ]
+        },
+        "slots": [{ "kind": "menu", "name": "Gears (mm)" }]
       }
     ],
     "commands": [
+      "document.inspect",
       "solid.cylinder",
       "solid.extrude",
       "solid.pattern.circular",
+      "solid.move",
       "sketch.create",
       "sketch.line",
       "sketch.arc.three_point",
