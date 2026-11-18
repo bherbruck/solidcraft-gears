@@ -1,86 +1,62 @@
-![SolidCraft Gears: involute gear generator plugin](og-image.png)
+# SolidCraft Gears Plugin (`solidcraft-gears` v0.1.15)
 
-# SolidCraft Gears
+An involute spur gear generator plugin for **SolidCraft** (`0.1.44+`) written in Rust and compiled to WebAssembly.
 
-An involute spur gear generator for [SolidCraft](https://github.com/tangency-labs/solidcraft). You give it a module, a tooth count and a face width; it draws the tooth profile in a sketch and extrudes it, using ordinary SolidCraft commands. What lands in your design is a normal timeline (a cylinder, a sketch, an extrude, a circular pattern and a bore), so you can open any of those features afterwards and change them. It is not a mesh.
+## Features
 
-I wrote the involute math myself from the textbook definitions, and it runs sandboxed as a WebAssembly plugin (`craft:plugin@0.1.0`, capability `commands@0.1`). It needs no files, no network and no clock.
+- **Separate Inch & Metric Menu Entries:** Launches directly from **Gears (in)** or **Gears (mm)** on the SolidCraft menu bar with unit-appropriate defaults (`in` or `mm`) and live preview before committing.
+- **Automatic Sequential Naming:** Names generated bodies `Gear 1`, `Gear 2`, `Gear 3`, etc., along with tooth count and outer diameter (`OD`).
+- **Auto-Mating & Tooth-Phase Alignment:** Automatically calculates center-to-center pitch distance and rotates mating gears into phase so teeth mesh cleanly (`Meshed` mode) or sit side-by-side with print clearance (`Separated` mode: `0.25 in` / `6.35 mm`).
+- **Profile Shift & Center Bore:** Supports addendum modification (`profile_shift`) and optional center bore cutouts.
 
-## Install
+---
 
-You need a SolidCraft build that has the plugin host (the `commands@0.1` capability).
+## Installation
 
-1. Download `solidcraft-gears-<version>.zip` from the [latest release](../../releases/latest).
-2. Unzip it into SolidCraft's plugins folder, so you end up with a `solidcraft-gears` folder in it holding `plugin.json` and `plugin.wasm`:
+1. Download `solidcraft-gears-0.1.15.zip` from the Releases page.
+2. Open **SolidCraft → Preferences → Plugins**.
+3. Click **Install from ZIP** (or load the archive), select `solidcraft-gears-0.1.15.zip`, and approve the plugin permissions.
+4. Two menu items will appear on your SolidCraft menu bar: **Gears (in)** and **Gears (mm)**.
 
-| OS | Plugins folder |
-|---|---|
-| Windows | `%LOCALAPPDATA%\SolidCraft\plugins\` |
-| macOS | `~/Library/Application Support/SolidCraft/plugins/` |
-| Linux | `$XDG_DATA_HOME/solidcraft/plugins/` (usually `~/.local/share/solidcraft/plugins/`) |
+---
 
-3. Start SolidCraft. Preferences > Plugins lists it; listing never runs any code. Each run needs your approval of the exact package contents.
+## Converting US Diametral Pitch (DP) to Inch Module
 
-The release also has a `.sha256` file if you want to check the download.
+Metric gears are specified directly by **Module (mm)**, whereas US customary gears are commonly specified by **Diametral Pitch (DP)**—the number of teeth per inch of pitch diameter.
 
-## Use
+Because the **Gears (in)** dialog expects **Module (in)** as a decimal number (it does not evaluate math formulas inside the input box), convert DP to Module beforehand:
 
-The plugin has one entry, `make-gear`. All sizes are millimetres.
+$$\text{Module (in)} = \frac{1}{\text{DP}}$$
 
-| Parameter | Default | Meaning |
-|---|---|---|
-| `module` | 2 | Module m. Pitch diameter is m x z |
-| `teeth` | 20 | Tooth count z, 8 to 80 |
-| `pressure_angle` | 20 | Pressure angle in degrees, 10 to 30 |
-| `face_width` | 10 | Gear thickness |
-| `bore_diameter` | 0 | Centre hole; 0 means none |
-| `profile_shift` | 0 | Profile shift coefficient x, -1 to 1 |
+### Example: 20-Tooth, 16 DP Gear
+1. Open **Gears (in)** from the SolidCraft menu bar.
+2. Calculate the inch module on a calculator:
+   $$1 \div 16 = 0.0625$$
+3. Enter **`0.0625`** into the **Module (in)** box.
+4. Set **Teeth** to **`20`**.
+5. Verify the resulting gear dimensions:
+   - **Pitch Diameter:** $0.0625 \times 20 = 1.250\text{ in}$
+   - **Outer Diameter (OD):** $0.0625 \times (20 + 2) = 1.375\text{ in}$
 
-The gear sits on the XY plane, centred on the origin, extruded up along +Z. The reply gives the pitch, base, outer and root diameters.
+### Common US Diametral Pitch Reference
 
-From the command line, with a `solidcraft-cli` that has the plugin host:
+| US Diametral Pitch (DP) | Formula ($1 \div \text{DP}$) | Enter in `Module (in)` |
+| :--- | :--- | :--- |
+| **8 DP** (coarse teeth) | $1 \div 8$ | `0.125` |
+| **10 DP** | $1 \div 10$ | `0.1` |
+| **12 DP** | $1 \div 12$ | `0.0833` |
+| **16 DP** | $1 \div 16$ | `0.0625` |
+| **20 DP** | $1 \div 20$ | `0.05` |
+| **24 DP** | $1 \div 24$ | `0.0417` |
+| **32 DP** (fine teeth) | $1 \div 32$ | `0.03125` |
 
-```
-solidcraft-cli run inspect.json --results        # [{"command":"plugin.inspect","params":{"path":"<plugins>/solidcraft-gears"}}]
-solidcraft-cli run make.json --results --save gear.sc
-```
+---
 
-where `make.json` is
+## Building from Source
 
-```json
-[{"command": "plugin.run", "params": {
-  "path": "<plugins>/solidcraft-gears",
-  "approval": "<the approval hash inspect gave you>",
-  "entry": "make-gear",
-  "params": {"module": 2, "teeth": 20, "face_width": 10, "bore_diameter": 6}}}]
-```
+Requires Rust (`wasm32-unknown-unknown` target) and `wasm-tools`:
 
-## What it builds
-
-- Standard full-depth teeth: addendum 1 m, dedendum 1.25 m, so with no shift the outer diameter is m (z + 2) and the root diameter m (z - 2.5).
-- Profile shift x moves the cutter: outer diameter m (z + 2 + 2x), root diameter m (z - 2.5 + 2x), and the tooth thickness on the pitch circle becomes m (pi/2 + 2 x tan a).
-- Each flank is an involute of the base circle (radius m z cos a / 2), drawn as a spline through 10 points computed exactly from the involute equations. Below the base circle (small tooth counts) the flank continues radially.
-- The root fillet is a circle of 0.3 m tangent to both the root circle and the flank. It is an approximation of the true trochoidal root a hob would cut, and it shrinks on its own if the gap is too narrow.
-
-Not modelled: undercut for very small tooth counts (hence the minimum of 8), backlash, helical or bevel teeth, and tip relief. The build extrudes one tooth wedge onto a hub and repeats it with a circular pattern, which gets slow as the count grows, so I cap the tooth count at 80 to stay inside the host's 30 second limit.
-
-## Tests
-
-`cargo test` checks the math (diameters, tooth thickness at the pitch circle, that the profile closes up). `tests/cli_test.py` runs the built plugin through `solidcraft-cli`, saves each design, and measures the result: one closed solid, the tooth count from the number of tip faces, the outer diameter from the largest cylinder, the bore, the face width, and the pitch diameter by cutting a thin ring around d = m z out of the gear and checking that the teeth fill the share of it that the tooth thickness says they should (half, with no shift).
-
-```
-./build.sh
-SOLIDCRAFT_CLI=/path/to/solidcraft-cli python3 tests/cli_test.py
-```
-
-## Build
-
-You need Rust with the `wasm32-unknown-unknown` target and [`wasm-tools`](https://github.com/bytecodealliance/wasm-tools). `./build.sh` builds the core module, wraps it as a component and leaves the package in `dist/solidcraft-gears/`. The WIT in `wit/` is a copy of SolidCraft's `craft:plugin@0.1.0`.
-
-## Releases
-
-Pushing a tag like `v0.1.0` runs `.github/workflows/release.yml`, which builds the plugin and attaches `solidcraft-gears-0.1.0.zip` and `solidcraft-gears-0.1.0.zip.sha256` to a GitHub release. The version in `Cargo.toml` and `plugin.json` has to match the tag.
-
-## License
-
-MIT, see [LICENSE](LICENSE).
+```powershell
+cargo build --release --lib --target wasm32-unknown-unknown
+wasm-tools component new target\wasm32-unknown-unknown\release\solidcraft_gears.wasm -o plugin.wasm
+Compress-Archive -Path plugin.json, plugin.wasm -DestinationPath ..\solidcraft-gears-0.1.15.zip -Force
